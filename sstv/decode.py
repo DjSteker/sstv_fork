@@ -1,4 +1,5 @@
-"""Class and methods to decode SSTV signal"""
+
+"""Clase y métodos para decodificar la señal SSTV."""
 
 import numpy as np
 import soundfile
@@ -10,19 +11,19 @@ from .common import log_message, progress_bar
 
 
 def calc_lum(freq):
-    """Converts SSTV pixel frequency range into 0-255 luminance byte"""
+    """Convierte el rango de frecuencia de píxeles SSTV en 0-255 bytes de luminancia"""
 
     lum = int(round((freq - 1500) / 3.1372549))
     return min(max(lum, 0), 255)
 
 
 def barycentric_peak_interp(bins, x):
-    """Interpolate between frequency bins to find x value of peak"""
+    """Interpolar entre contenedores de frecuencia para encontrar el valor x del pico"""
 
-    # Takes x as the index of the largest bin and interpolates the
-    # x value of the peak using neighbours in the bins array
+    # Toma x como índice del contenedor más grande e interpola el
+    # x valor del pico usando vecinos en la matriz de contenedores
 
-    # Make sure data is in bounds
+    # Asegúrese de que los datos estén dentro de los límites
     y1 = bins[x] if x <= 0 else bins[x-1]
     y3 = bins[x] if x + 1 >= len(bins) else bins[x+1]
 
@@ -35,7 +36,7 @@ def barycentric_peak_interp(bins, x):
 
 class SSTVDecoder(object):
 
-    """Create an SSTV decoder for decoding audio data"""
+    """Cree un decodificador SSTV para decodificar datos de audio"""
 
     def __init__(self, audio_file):
         self.mode = None
@@ -57,10 +58,9 @@ class SSTVDecoder(object):
         self.close()
 
     def decode(self, skip=0.0):
-        """Attempts to decode the audio data as an SSTV signal
-
-        Returns a PIL image on success, and None if no SSTV signal was found
-        """
+        """Intenta decodificar los datos de audio como una señal SSTV
+         Devuelve una imagen PIL en caso de éxito y Ninguna si no se encontró ninguna señal SSTV
+         """
 
         if skip > 0.0:
             self._samples = self._samples[round(skip * self._sample_rate):]
@@ -79,32 +79,32 @@ class SSTVDecoder(object):
         return self._draw_image(image_data)
 
     def close(self):
-        """Closes any input files if they exist"""
+        """Cierra cualquier archivo de entrada si existe"""
 
         if self._audio_file is not None and not self._audio_file.closed:
             self._audio_file.close()
 
     def _peak_fft_freq(self, data):
-        """Finds the peak frequency from a section of audio data"""
+        """Encuentra la frecuencia máxima de una sección de datos de audio"""
 
         windowed_data = data * hann(len(data))
         fft = np.abs(np.fft.rfft(windowed_data))
 
-        # Get index of bin with highest magnitude
+        # Obtener el índice del contenedor de mayor magnitu
         x = np.argmax(fft)
-        # Interpolated peak frequency
+        # Frecuencia máxima interpolada
         peak = barycentric_peak_interp(fft, x)
 
         # Return frequency in hz
         return peak * self._sample_rate / len(windowed_data)
 
     def _find_header(self):
-        """Finds the approx sample of the end of the calibration header"""
+        """Encuentra la muestra aproximada del final del encabezado de calibración"""
 
         header_size = round(spec.HDR_SIZE * self._sample_rate)
         window_size = round(spec.HDR_WINDOW_SIZE * self._sample_rate)
 
-        # Relative sample offsets of the header tones
+        # Desplazamientos de muestra relativos de los tonos del encabezado
         leader_1_sample = 0
         leader_1_search = leader_1_sample + window_size
 
@@ -119,13 +119,13 @@ class SSTVDecoder(object):
 
         jump_size = round(0.002 * self._sample_rate)  # check every 2ms
 
-        # The margin of error created here will be negligible when decoding the
-        # vis due to each bit having a length of 30ms. We fix this error margin
-        # when decoding the image by aligning each sync pulse
+        # El margen de error creado aquí será insignificante al decodificar el
+        # vis debido a que cada bit tiene una longitud de 30 ms. Arreglamos este margen de error
+        # al decodificar la imagen alineando cada pulso de sincronización
 
         for current_sample in range(0, len(self._samples) - header_size,
                                     jump_size):
-            # Update search progress message
+            # Actualizar mensaje de progreso de búsqueda
             if current_sample % (jump_size * 256) == 0:
                 search_msg = "Searching for calibration header... {:.1f}s"
                 progress = current_sample / self._sample_rate
@@ -139,7 +139,7 @@ class SSTVDecoder(object):
             leader_2_area = search_area[leader_2_sample:leader_2_search]
             vis_start_area = search_area[vis_start_sample:vis_start_search]
 
-            # Check they're the correct frequencies
+            # Comprueba que sean las frecuencias correctas.
             if (abs(self._peak_fft_freq(leader_1_area) - 1900) < 50
                and abs(self._peak_fft_freq(break_area) - 1200) < 50
                and abs(self._peak_fft_freq(leader_2_area) - 1900) < 50
@@ -150,12 +150,12 @@ class SSTVDecoder(object):
                 return current_sample + header_size
 
         log_message()
-        log_message("Couldn't find SSTV header in the given audio file",
+        log_message("No se pudo encontrar el encabezado SSTV en el archivo de audio proporcionado",
                     err=True)
         return None
 
     def _decode_vis(self, vis_start):
-        """Decodes the vis from the audio data and returns the SSTV mode"""
+        """Decodifica el vis de los datos de audio y devuelve el modo SSTV"""
 
         bit_size = round(spec.VIS_BIT_SIZE * self._sample_rate)
         vis_bits = []
@@ -167,12 +167,12 @@ class SSTVDecoder(object):
             # 1100 hz = 1, 1300hz = 0
             vis_bits.append(int(freq <= 1200))
 
-        # Check for even parity in last bit
+        # Compruebe si hay paridad uniforme en el último bit
         parity = sum(vis_bits) % 2 == 0
         if not parity:
             raise ValueError("Error decoding VIS header (invalid parity bit)")
 
-        # LSB first so we must reverse and ignore the parity bit
+        # LSB primero por lo que debemos invertir e ignorar el bit de paridad
         vis_value = 0
         for bit in vis_bits[-2::-1]:
             vis_value = (vis_value << 1) | bit
@@ -182,12 +182,12 @@ class SSTVDecoder(object):
             raise ValueError(error.format(vis_value))
 
         mode = spec.VIS_MAP[vis_value]
-        log_message("Detected SSTV mode {}".format(mode.NAME))
+        log_message("Modo SSTV detectado {}".format(mode.NAME))
 
         return mode
 
     def _align_sync(self, align_start, start_of_sync=True):
-        """Returns sample where the beginning of the sync pulse was found"""
+        """Devuelve una muestra donde se encontró el comienzo del pulso de sincronización"""
 
         # TODO - improve this
 
@@ -212,7 +212,7 @@ class SSTVDecoder(object):
             return end_sync
 
     def _decode_image_data(self, image_start):
-        """Decodes image from the transmission section of an sstv signal"""
+        """Decodifica la imagen de la sección de transmisión de una señal sstv"""
 
         window_factor = self.mode.WINDOW_FACTOR
         centre_window_time = (self.mode.PIXEL_TIME * window_factor) / 2
@@ -221,21 +221,21 @@ class SSTVDecoder(object):
         height = self.mode.LINE_COUNT
         channels = self.mode.CHAN_COUNT
         width = self.mode.LINE_WIDTH
-        # Use list comprehension to init list so we can return data early
+        # Utilice la comprensión de listas para iniciar la lista para que podamos devolver los datos antes
         image_data = [[[0 for i in range(width)]
                        for j in range(channels)] for k in range(height)]
 
         seq_start = image_start
         if self.mode.HAS_START_SYNC:
-            # Start at the end of the initial sync pulse
+            # Comience al final del pulso de sincronización inicial
             seq_start = self._align_sync(image_start, start_of_sync=False)
             if seq_start is None:
-                raise EOFError("Reached end of audio before image data")
+                raise EOFError("Se alcanzó el final del audio antes que los datos de la imagen")
 
         for line in range(height):
 
             if self.mode.CHAN_SYNC > 0 and line == 0:
-                # Align seq_start to the beginning of the previous sync pulse
+                # Alinear seq_start con el comienzo del pulso de sincronización anterior
                 sync_offset = self.mode.CHAN_OFFSETS[self.mode.CHAN_SYNC]
                 seq_start -= round((sync_offset + self.mode.SCAN_TIME)
                                    * self._sample_rate)
@@ -244,20 +244,20 @@ class SSTVDecoder(object):
 
                 if chan == self.mode.CHAN_SYNC:
                     if line > 0 or chan > 0:
-                        # Set base offset to the next line
+                        # Establecer desplazamiento base a la siguiente línea
                         seq_start += round(self.mode.LINE_TIME *
                                            self._sample_rate)
 
-                    # Align to start of sync pulse
+                    # Alinear con el inicio del pulso de sincronización
                     seq_start = self._align_sync(seq_start)
                     if seq_start is None:
                         log_message()
-                        log_message("Reached end of audio whilst decoding.")
+                        log_message("Se alcanzó el final del audio durante la decodificación.")
                         return image_data
 
                 pixel_time = self.mode.PIXEL_TIME
                 if self.mode.HAS_HALF_SCAN:
-                    # Robot mode has half-length second/third scans
+                    # El modo robot tiene un segundo/tercer escaneo de longitud media
                     if chan > 0:
                         pixel_time = self.mode.HALF_PIXEL_TIME
 
@@ -274,10 +274,10 @@ class SSTVDecoder(object):
                                    self._sample_rate)
                     px_end = px_pos + pixel_window
 
-                    # If we are performing fft past audio length, stop early
+                    # Si estamos ejecutando fft más allá de la duración del audio, deténgase antes
                     if px_end >= len(self._samples):
                         log_message()
-                        log_message("Reached end of audio whilst decoding.")
+                        log_message("Se alcanzó el final del audio durante la decodificación.")
                         return image_data
 
                     pixel_area = self._samples[px_pos:px_end]
@@ -285,12 +285,12 @@ class SSTVDecoder(object):
 
                     image_data[line][chan][px] = calc_lum(freq)
 
-            progress_bar(line, height - 1, "Decoding image...")
+            progress_bar(line, height - 1, "Decodificando imagen...")
 
         return image_data
 
     def _draw_image(self, image_data):
-        """Renders the image from the decoded sstv signal"""
+        """Representa la imagen a partir de la señal sstv decodificada"""
 
         # Let PIL do YUV-RGB conversion for us
         if self.mode.COLOR == spec.COL_FMT.YUV:
@@ -343,5 +343,5 @@ class SSTVDecoder(object):
         if image.mode != "RGB":
             image = image.convert("RGB")
 
-        log_message("...Done!")
+        log_message("...¡Hecho!")
         return image
